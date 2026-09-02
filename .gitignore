@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Shadow runtime data (never ship state)
+shadow_data/
+*.pid
+heartbeat.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Runtime state (generated at first run)
+self_improve/data/
+vault/data/

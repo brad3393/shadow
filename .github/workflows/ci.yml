@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Verify offline-first contract (stdlib or guarded imports only)
+        run: |
+          python - <<'PY'
+          import pathlib, ast, sys
+          repo = pathlib.Path('.').resolve()
+          local = {p.name for p in repo.iterdir() if p.is_dir() and (p / '__init__.py').exists()}
+          local |= {p.stem for p in repo.glob('*.py')}
+          allowed = set(sys.stdlib_module_names) | local
+
+          # Imports inside try blocks are the sanctioned pattern for optional
+          # extras (e.g. PyPDF2) — they must degrade gracefully when missing.
+          guarded = set()
+          def scan(node, inside_try):
+              for child in ast.iter_child_nodes(node):
+                  if isinstance(child, ast.Try):
+                      scan(child, True)
+                  else:
+                      if isinstance(child, (ast.Import, ast.ImportFrom)):
+                          if inside_try:
+                              mods = [a.name.split('.')[0] for a in child.names] \
+                                     if isinstance(child, ast.Import) \
+                                     else [child.module.split('.')[0]] if child.module else []
+                              guarded.update(m for m in mods if m)
+                      scan(child, inside_try)
+          externals = set()
+          for p in repo.rglob('*.py'):
+              if 'shadow_data' in p.parts:
+                  continue
+              tree = ast.parse(p.read_text())
+              scan(tree, False)
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for a in node.names:
+                          m = a.name.split('.')[0]
+                          if m not in allowed and m not in guarded:
+                              externals.add((m, str(p)))
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      m = node.module.split('.')[0]
+                      if m not in allowed and m not in guarded:
+                          externals.add((m, str(p)))
+          if externals:
+              for m, p in sorted(externals):
+                  print(f"Unguarded non-stdlib import: {m} in {p}")
+              sys.exit(1)
+          print(f"OK — stdlib/local imports only ({len(local)} local modules); optional extras are try-guarded.")
+          PY
+
+      - name: Run test suite
+        run: python tests/test_shadow.py

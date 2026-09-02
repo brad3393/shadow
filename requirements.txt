@@ -1,0 +1,3 @@
+# Shadow has zero external dependencies — pure Python 3.10+ standard library.
+# This file exists to make that guarantee explicit.
+# Optional runtime enhancement: install Ollama locally (https://ollama.com).
