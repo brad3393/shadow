@@ -231,3 +231,18 @@ shadow/
 ---
 
 *Shadow was built by Brad Randa with the assistance of Solene (Base44 Superagent).*
+
+## ShadowOS — dedicated appliance mode
+
+Have an old laptop? Turn it into a dedicated Shadow machine: minimal
+Debian stripped to one job, booting **straight into Shadow's console** —
+no desktop, no login screen. The REST API comes up with it, and Shadow's
+AI calls route to a beefier machine's Ollama over Tailscale.
+
+```
+power button → 15s → Shadow console (fullscreen) + API :8787
+```
+
+See [shadowos/README_SHADOWOS.md](shadowos/README_SHADOWOS.md) for the
+45-minute install guide and [shadowos/install-shadowos.sh](shadowos/install-shadowos.sh)
+for the one-command installer.
