@@ -17,15 +17,35 @@ echo [1/3] Verifying Shadow install...
 %PY_CMD% main.py --status
 if errorlevel 1 ( echo Self-check failed. & pause & exit /b 1 )
 echo OK - all systems verified.
+
+REM --- secure bind: Tailscale only, never the raw LAN ----------
+set "TS_IP="
+set "TS_BIN=%ProgramFiles%\Tailscale\tailscale.exe"
+if not exist "%TS_BIN%" set "TS_BIN=%ProgramFiles(x86)%\Tailscale\tailscale.exe"
+if exist "%TS_BIN%" (
+  for /f "usebackq delims=" %%i in (`"%TS_BIN%" ip -4 2^>nul`) do (
+    if not defined TS_IP set "TS_IP=%%i"
+  )
+)
+if defined TS_IP (
+  set "BIND=!TS_IP!"
+  echo [2/3] SECURE TUNNEL MODE: API binds to Tailscale interface !BIND!
+  echo       Hotel/LAN neighbors cannot see or reach Shadow.
+  echo       From your phone:  http://!BIND!:8787
+) else (
+  set "BIND=127.0.0.1"
+  echo [2/3] Tailscale not detected - API binds to localhost only ^(safe standby^).
+  echo       Shadow is unreachable from the network. For secure phone
+  echo       access install Tailscale on both devices, then re-plug:
+  echo       https://tailscale.com/download
+)
+
 set "SHADOW_PORT=8787"
 netstat -ano | findstr ":%SHADOW_PORT% " | findstr "LISTENING" >nul
 if errorlevel 1 (
-  echo [2/3] Starting REST API server on port %SHADOW_PORT%...
-  start "Shadow API" /min cmd /c "%PY_CMD% api_server.py --host 0.0.0.0 --port %SHADOW_PORT%"
+  start "Shadow API" /min cmd /c "%PY_CMD% api_server.py --host %BIND% --port %SHADOW_PORT%"
   timeout /t 2 >nul
-) else ( echo [2/3] REST API already running on port %SHADOW_PORT%. )
-echo OK - phone can reach Shadow at http://[laptop-ip]:%SHADOW_PORT%
-echo (first run: Windows firewall prompt - tick Private networks + Allow)
+) else ( echo       API already running on port %SHADOW_PORT%. )
 echo [3/3] Starting Shadow command line...
 %PY_CMD% main.py
 endlocal
